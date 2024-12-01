@@ -1,0 +1,260 @@
+# mixing model
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+
+# Define fixed values and data
+F14C_soil = 1.0
+F14C_cave_values = [0.94, 0.90, 0.88]
+F14C_carbonate_values = [0.78, 0.88, 0.98]
+
+# Calculate fractions and store in DataFrame
+results = []
+for F14C_cave in F14C_cave_values:
+    for F14C_carbonate in F14C_carbonate_values:
+        f_soil = (F14C_cave - F14C_carbonate) / (F14C_soil - F14C_carbonate)
+        f_carbonate = 1 - f_soil
+        results.append([F14C_cave, F14C_carbonate, f_soil, f_carbonate])
+df_fractions = pd.DataFrame(results, columns=['F14C_cave', 'F14C_carbonate', 'f_soil', 'f_carbonate'])
+
+# Define colors and markers
+colors = ['#0072B2', '#D55E00', '#009E73']
+soil_marker = 'o'
+carbonate_marker = 'x'
+
+# Create the plot
+plt.figure(figsize=(11, 6))
+handles = []
+labels = []
+
+for i, F14C_cave in enumerate(df_fractions['F14C_cave'].unique()):
+    subset = df_fractions[df_fractions['F14C_cave'] == F14C_cave]
+    color = colors[i]
+    
+    soil_plot, = plt.plot(subset['F14C_carbonate'], subset['f_soil'], marker=soil_marker, markersize=10, 
+                          linestyle='-', color=color)
+    carbonate_plot, = plt.plot(subset['F14C_carbonate'], subset['f_carbonate'], marker=carbonate_marker, markersize=10, 
+                               linestyle='--', color=color)
+    
+    main_label = Line2D([0], [0], color='none', label=f'$F^{{14}}C_{{cave}} = {F14C_cave:.2f}$')
+    handles.extend([main_label, soil_plot, carbonate_plot])
+    labels.extend([f'$F^{{14}}C_{{cave}} = {F14C_cave:.2f}$', "Soil fraction", "Carbonate fraction"])
+
+plt.axhspan(0, 1, color='gray', alpha=0.3)
+plt.xticks(F14C_carbonate_values, fontsize=17)
+plt.yticks(fontsize=17)
+plt.ylim(-6, 6)
+plt.xlabel('$F^{14}C$ DIC', fontsize=17)
+plt.ylabel('Fraction of Soil / DIC', fontsize=17)
+plt.grid(True)
+plt.legend(handles=handles, labels=labels, loc='upper left', bbox_to_anchor=(1, 1), fontsize=14, handletextpad=1.5)
+plt.tight_layout()
+plt.savefig('mixingmodel.svg', dpi=500, bbox_inches='tight')
+plt.savefig('mixignmodel.png', dpi=500, bbox_inches='tight')
+plt.savefig('mixingmodel.pdf', dpi=500, bbox_inches='tight')
+plt.show()
+
+________________________________________________________________________________________________
+import numpy as np
+import pandas as pd
+
+# Fixed values
+F14C_soil = 1.0  # Soil F14C is constant
+F14C_cave_values = [0.94, 0.90, 0.88]  # Observed F14C_cave values
+
+# Define d13C constants
+d13C_soil = -26  # Soil d13C (no fractionation)
+d13C_carbonate = -15  # Base carbonate d13C value before fractionation
+d13C_carbonate_eq = d13C_carbonate + (-9.54)  # Equilibrium degassing
+d13C_carbonate_kin = d13C_carbonate + (-30)  # Kinetic degassing
+
+# Range of DIC F14C values to test
+F14C_carbonate_range = np.arange(0.5, 1.05, 0.05)  # Test from 0.70 to 1.00 in steps of 0.01
+
+# Initialize a list to store results
+results = []
+
+# Iterate over each F14C_cave value
+for F14C_cave in F14C_cave_values:
+    # Test for each DIC F14C (carbonate) value in the range
+    for F14C_carbonate in F14C_carbonate_range:
+        # Solve for the fraction of soil using F14C balance for each case
+        f_soil = (F14C_cave - F14C_carbonate) / (F14C_soil - F14C_carbonate)
+        f_carbonate = 1 - f_soil
+        
+        # Check if the mixing fractions are physically valid (0 <= f <= 1)
+        if 0 <= f_soil <= 1 and 0 <= f_carbonate <= 1:
+            # Calculate d13C_cave for both equilibrium and kinetic degassing scenarios
+            d13C_cave_eq = (f_soil * d13C_soil) + (f_carbonate * d13C_carbonate_eq)
+            d13C_cave_kin = (f_soil * d13C_soil) + (f_carbonate * d13C_carbonate_kin)
+            
+            # Append
+            # Append the results: F14C_cave, F14C_carbonate, f_soil, f_carbonate, d13C_cave_eq, d13C_cave_kin
+            results.append([F14C_cave, F14C_carbonate, f_soil, f_carbonate, d13C_cave_eq, d13C_cave_kin])
+
+# Convert results to a DataFrame
+df_results = pd.DataFrame(results, columns=['F14C_cave', 'F14C_carbonate', 'f_soil', 'f_carbonate', 
+                                            'd13C_cave_eq', 'd13C_cave_kin'])
+
+# Filter the results where either d13C_cave for equilibrium OR kinetic falls between -25 and -27 permille
+filtered_results = df_results[((df_results['d13C_cave_eq'] >= -27) & (df_results['d13C_cave_eq'] <= -25)) | 
+                              ((df_results['d13C_cave_kin'] >= -27) & (df_results['d13C_cave_kin'] <= -25))]
+
+# Display the filtered results
+filtered_results
+
+
+from matplotlib.lines import Line2D
+import matplotlib.pyplot as plt
+
+# Initialize plot
+plt.figure(figsize=(11, 6))
+handles = []
+labels = []
+
+# Plot d13C_cave_eq and d13C_cave_kin as functions of F14C_carbonate
+for idx, F14C_cave in enumerate(filtered_results['F14C_cave'].unique()):
+    subset = filtered_results[filtered_results['F14C_cave'] == F14C_cave]
+    color = colorblind_friendly_colors[idx]
+    
+    # Plot equilibrium d13C
+    plt.plot(subset['F14C_carbonate'], subset['d13C_cave_eq'], 
+             marker='o', markersize=10, linestyle='-', linewidth=2, color=color)
+    
+    # Plot kinetic d13C
+    plt.plot(subset['F14C_carbonate'], subset['d13C_cave_kin'], 
+             marker='*', markersize=16, linestyle='-', linewidth=2, color=color)
+    
+    # Create line-only entry for the main F14C_cave label
+    main_label = Line2D([0], [1], color=color, linestyle='-', linewidth=2, label=f'{f14C} cave = {F14C_cave:.2f}')
+    handles.append(main_label)
+    labels.append(f'{f14C} cave = {F14C_cave:.2f}')
+
+# Add single black marker entries for Equilibrium and Kinetic
+eq_marker = Line2D([0], [0], marker='o', color='black', linestyle='None', markersize=10, label="Equilibrium")
+kin_marker = Line2D([0], [0], marker='*', color='black', linestyle='None', markersize=16, label="Kinetic")
+handles.extend([eq_marker, kin_marker])
+labels.extend(["Equilibrium", "Kinetic"])
+
+# Add a transparent horizontal bar between -27 and -25 permille
+plt.axhspan(-27, -25, color='gray', alpha=0.3)
+
+# Customize axis labels and ticks
+plt.xlabel(f'{f14C} DIC', fontsize=16)
+plt.ylabel(f'{delta} cave (‰)', fontsize=16)
+
+plt.gca().yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{x:.2f}'))
+
+# Customize axis label and tick sizes
+plt.xticks(fontsize=16)
+plt.yticks(fontsize=16)
+
+# Add a grid
+plt.grid(True)
+
+# Customized legend with subheadings
+plt.legend(handles=handles, labels=labels, loc='upper left', bbox_to_anchor=(1, 1), fontsize=14, handletextpad=1.5)
+
+# Show the plot
+plt.tight_layout()
+
+plt.savefig('d13Ccave_from_30_kinetic.svg', dpi=500, bbox_inches='tight')
+plt.savefig('d13Ccave_from_30_kinetic.png', dpi=500, bbox_inches='tight')
+plt.savefig('d13Ccave_from_30_kinetic.pdf', dpi=500, bbox_inches='tight')
+plt.show()
+
+__________________________________________________________________________________________________________
+
+
+import numpy as np
+import pandas as pd
+
+# Fixed values
+F14C_soil = 1.0  # Soil F14C is constant
+F14C_cave_values = [0.94, 0.90, 0.88]  # Observed F14C_cave values
+
+# Define d13C constants
+d13C_soil = -26  # Soil d13C (no fractionation)
+d13C_carbonate = -15  # Base carbonate d13C value before fractionation
+d13C_carbonate_eq = d13C_carbonate + (-9.54)  # Equilibrium degassing
+d13C_carbonate_kin = d13C_carbonate + (-10)  # Kinetic degassing
+
+# Range of DIC F14C values to test
+F14C_carbonate_range = np.arange(0.5, 1.05, 0.05)  # Test from 0.70 to 1.00 in steps of 0.01
+
+# Initialize a list to store results
+results = []
+
+# Iterate over each F14C_cave value
+for F14C_cave in F14C_cave_values:
+    # Test for each DIC F14C (carbonate) value in the range
+    for F14C_carbonate in F14C_carbonate_range:
+        # Solve for the fraction of soil using F14C balance for each case
+        f_soil = (F14C_cave - F14C_carbonate) / (F14C_soil - F14C_carbonate)
+        f_carbonate = 1 - f_soil
+        
+        # Check if the mixing fractions are physically valid (0 <= f <= 1)
+        if 0 <= f_soil <= 1 and 0 <= f_carbonate <= 1:
+            # Calculate d13C_cave for both equilibrium and kinetic degassing scenarios
+            d13C_cave_eq = (f_soil * d13C_soil) + (f_carbonate * d13C_carbonate_eq)
+            d13C_cave_kin = (f_soil * d13C_soil) + (f_carbonate * d13C_carbonate_kin)
+            
+            # Append
+            # Append the results: F14C_cave, F14C_carbonate, f_soil, f_carbonate, d13C_cave_eq, d13C_cave_kin
+            results.append([F14C_cave, F14C_carbonate, f_soil, f_carbonate, d13C_cave_eq, d13C_cave_kin])
+
+# Convert results to a DataFrame for better visualization
+df_results = pd.DataFrame(results, columns=['F14C_cave', 'F14C_carbonate', 'f_soil', 'f_carbonate', 
+                                            'd13C_cave_eq', 'd13C_cave_kin'])
+
+# Filter the results where either d13C_cave for equilibrium OR kinetic falls between -25 and -27 permille
+filtered_results = df_results[((df_results['d13C_cave_eq'] >= -27) & (df_results['d13C_cave_eq'] <= -25)) | 
+                              ((df_results['d13C_cave_kin'] >= -27) & (df_results['d13C_cave_kin'] <= -25))]
+
+# Display the filtered results
+filtered_results
+# Greek symbol for delta and proper superscripts for 14C
+f14C = r'$F^{14}C$'
+
+# Customize the plot with colorblind-friendly colors, ensuring the same F14C_cave has the same color for both fractions
+colorblind_friendly_colors = ['#0072B2', '#D55E00', '#009E73']  # Colorblind-friendly colors
+
+plt.figure(figsize=(12, 6))
+
+# Plot f_soil and f_carbonate as functions of F14C_carbonate
+for idx, F14C_cave in enumerate(F14C_cave_values):
+    subset = filtered_results[filtered_results['F14C_cave'] == F14C_cave]
+    
+    # Use the same color for both soil and carbonate fractions for each F14C_cave
+    color = colorblind_friendly_colors[idx]
+    
+    # Soil fraction
+    plt.plot(subset['F14C_carbonate'], subset['f_soil'], label=f'Soil fraction ({f14C} cave = {F14C_cave})', 
+             marker='o', markersize=8, linestyle='-', linewidth=2, color=color)
+    
+    # DIC fraction
+    plt.plot(subset['F14C_carbonate'], subset['f_carbonate'], label=f'Carbonate fraction ({f14C} cave = {F14C_cave})', 
+             marker='x', markersize=8, linestyle='--', linewidth=2, color=color)
+
+# Customize axis labels and ticks
+plt.xlabel(f'{f14C} DIC', fontsize=14)
+plt.ylabel('Fraction of Soil / DIC', fontsize=14)
+#plt.title(f'Mixing Fractions of Soil and Carbonate as a Function of {f14C}_{{carbonate}}', fontsize=16)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+
+# Add a grid and legend
+plt.grid(True)
+
+# Move the legend outside the plot
+plt.legend(fontsize=12, bbox_to_anchor=(1, 1), loc='upper left')
+
+# Show the plot
+plt.tight_layout()
+
+plt.savefig('Fractions for varying F14CDIC.svg', dpi=500, bbox_inches='tight')
+plt.savefig('Fractions for varying F14CDIC.png', dpi=500, bbox_inches='tight')
+plt.savefig('Fractions for varying F14CDIC.pdf', dpi=500, bbox_inches='tight')
+
+plt.show()
