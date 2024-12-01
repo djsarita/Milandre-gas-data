@@ -1,0 +1,424 @@
+import pandas as pd
+from scipy.stats import spearmanr
+
+# Load the dataset
+data = pd.read_csv('Masterfile_gas-samples.csv')
+
+# Filter out data points with Type "Soil" and "Atmosphere"
+filtered_data = data[(data['Type'] != 'Soil') & 
+                     (data['Type'] != 'Soil na') & 
+                     (data['Type'] != 'Atmosphere') & 
+                     (data['Name'] != 'SG-05-CO2-10') & 
+                     (data['Name'] != 'SG-05-CO2-4')]
+
+# GR- UPSTREAM
+# Filter out data points based on your criteria
+filtered_data = data[
+    (data['Type'] != 'Soil na') &
+    (data['Type'] != 'Atmosphere') &
+    (data['Type'] != 'Well') &
+    (data['Type'] != 'Well epi') &
+    (data['Type'] != 'Well soil') &
+    (data['Cover'] != 'Forest') &
+    (data['Type'] != 'Cave GF') &
+    (data['Cover'] != 'Meadow') &
+    (data['Name'] != 'SG-05-CO2-10') &
+    (data['Name'] != 'SG-05-CO2-4')
+]
+
+# Define the parameters you want to calculate correlations for
+parameters = ['pCO2corr', 'd13Ccorr', 'F14C', 'Monthly mean temperature', 'Monthly mean precipitation']
+
+# Create DataFrames for the correlations and p-values
+correlation_df = pd.DataFrame(index=parameters, columns=parameters)
+p_value_df = pd.DataFrame(index=parameters, columns=parameters)
+
+# Calculate correlations for each combination of parameters
+for param1 in parameters:
+    for param2 in parameters:
+        correlation_coefficient, p_value = spearmanr(filtered_data[param1], filtered_data[param2])
+        
+        # Fill the correlation and p-value matrices
+        correlation_df.loc[param1, param2] = correlation_coefficient
+        p_value_df.loc[param1, param2] = p_value
+
+# Set up the color map
+cmap = sns.diverging_palette(250, 10, as_cmap=True)
+
+# Plot the correlation matrix
+plt.figure(figsize=(10, 8))
+
+# Rename the parameter labels here
+param_labels = {
+    'pCO2corr': 'pCO$\mathregular{_2}$',
+    'd13Ccorr': r'$\delta$¹³C',
+    'F14C': 'F$\mathregular{^{14}}$C',
+    'Monthly mean temperature': 'MMT',
+    'Monthly mean precipitation': 'MMP'
+}
+
+# Rename row and column labels
+correlation_df.rename(index=param_labels, columns=param_labels, inplace=True)
+p_value_df.rename(index=param_labels, columns=param_labels, inplace=True)
+
+# Create the heatmap
+heatmap = sns.heatmap(correlation_df.astype(float), annot=False, cmap=cmap, center=0, linewidths=0.5, cbar_kws={'label': 'Correlation Strength'})
+
+# Annotate the heatmap with correlation values
+for i in range(len(correlation_df)):
+    for j in range(len(correlation_df.columns)):
+        correlation_value = correlation_df.iloc[i, j]
+        p_value = p_value_df.iloc[i, j]
+        text_color = 'black'
+        fontweight = 'bold' if p_value < 0.05 else 'normal'
+        heatmap.text(j+0.5, i+0.5, f'{correlation_value:.2f}', ha='center', va='center', color=text_color, fontsize=10, fontweight=fontweight)
+
+# Save the figure
+plt.savefig('GR_correlation_matrix.png', format='png', dpi=300)
+plt.show()
+
+# GF- DOWNSTREAM
+
+# Filter out data points with specified Types and Names
+filtered_data = data[
+    (data['Type'] != 'Soil na') &
+    (data['Type'] != 'Atmosphere') &
+    (data['Type'] != 'Well') &
+    (data['Type'] != 'Well soil') &
+    (data['Type'] != 'Cave GR') &
+    (data['Type'] != 'Well epi') &
+    (data['Name'] != 'SG-05-CO2-10') &
+    (data['Name'] != 'SG-05-CO2-4')
+]
+
+# Create an empty DataFrame to store the results
+results_df = pd.DataFrame(columns=['Parameter 1', 'Parameter 2', 'R', 'P-Value', 'Direction', 'Significance', 'Data Points'])
+
+# Define the parameters you want to calculate correlations for
+parameters = ['pCO2corr', 'd13Ccorr', 'F14C', 'Monthly mean temperature', 'Monthly mean precipitation']
+
+# Calculate correlations for each combination of parameters without repeats
+for i in range(len(parameters)):
+    for j in range(i + 1, len(parameters)):
+        param1 = parameters[i]
+        param2 = parameters[j]
+
+        # Drop NA values for the current pair of parameters
+        data_pair = filtered_data[[param1, param2]].dropna()
+
+        # Calculate correlation
+        correlation_coefficient, p_value = spearmanr(data_pair[param1], data_pair[param2])
+
+        # Round the correlation coefficient and p-value to 2 significant figures
+        correlation_coefficient = round(correlation_coefficient, 2)
+        p_value = round(p_value, 2)
+
+        # Determine the direction of correlation (positive or negative)
+        direction = 'Positive' if correlation_coefficient > 0 else 'Negative'
+
+        # Determine significance (you can choose your significance level)
+        significance = 'Significant' if p_value < 0.05 else 'Not Significant'
+
+        # Add the results to the DataFrame
+        result = {'Parameter 1': param1, 'Parameter 2': param2,
+                  'R': correlation_coefficient, 'P-Value': p_value,
+                  'Direction': direction, 'Significance': significance,
+                  'Data Points': len(data_pair)}
+        results_df = pd.concat([results_df, pd.DataFrame([result])], ignore_index=True)
+
+# Save the results to a CSV file
+results_df.to_csv('GF_correlation_results.csv', index=False)  # Save as a CSV file
+
+# Print the results in a table format
+print(results_df.to_string(index=False))
+
+
+# Soil Forest - SHALLOW 1
+
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy.stats import spearmanr
+
+# Filter out data points with specified Types
+filtered_data = data[
+    (data['Type'] != 'Soil na') &
+    (data['Type'] != 'Atmosphere') &
+    (data['Type'] != 'Well') &
+    (data['Type'] != 'Well epi') &
+    (data['Type'] != 'Cave GR') &
+    (data['Type'] != 'Cave GF') &
+    (data['Cover'] != 'Meadow') &
+    (data['Name'] != 'SG-05-CO2-10') &
+    (data['Name'] != 'SG-05-CO2-4')
+]
+
+# Define the parameters you want to calculate correlations for
+parameters = ['pCO2corr', 'd13Ccorr', 'F14C', 'Monthly mean temperature', 'Monthly mean precipitation']
+
+# Create DataFrames for the correlations and p-values
+correlation_df = pd.DataFrame(index=parameters, columns=parameters)
+p_value_df = pd.DataFrame(index=parameters, columns=parameters)
+
+# Calculate correlations for each combination of parameters
+for param1 in parameters:
+    for param2 in parameters:
+        correlation_coefficient, p_value = spearmanr(filtered_data[param1], filtered_data[param2])
+        
+        # Fill the correlation and p-value matrices
+        correlation_df.loc[param1, param2] = correlation_coefficient
+        p_value_df.loc[param1, param2] = p_value
+
+# Set up the color map
+cmap = sns.diverging_palette(250, 10, as_cmap=True)
+
+# Plot the correlation matrix
+plt.figure(figsize=(10, 8))
+
+# Rename the parameter labels here
+param_labels = {
+    'pCO2corr': 'pCO$\mathregular{_2}$',
+    'd13Ccorr': r'$\delta$¹³C',
+    'F14C': 'F$\mathregular{^{14}}$C',
+    'Monthly mean temperature': 'MMT',
+    'Monthly mean precipitation': 'MMP'
+}
+
+# Rename row and column labels
+correlation_df.rename(index=param_labels, columns=param_labels, inplace=True)
+p_value_df.rename(index=param_labels, columns=param_labels, inplace=True)
+
+# Create the heatmap
+heatmap = sns.heatmap(correlation_df.astype(float), annot=False, cmap=cmap, center=0, linewidths=0.5, cbar_kws={'label': 'Correlation Strength'})
+
+# Annotate the heatmap with correlation values
+for i in range(len(correlation_df)):
+    for j in range(len(correlation_df.columns)):
+        correlation_value = correlation_df.iloc[i, j]
+        p_value = p_value_df.iloc[i, j]
+        text_color = 'black'
+        fontweight = 'bold' if p_value < 0.05 else 'normal'
+        heatmap.text(j+0.5, i+0.5, f'{correlation_value:.2f}', ha='center', va='center', color=text_color, fontsize=10, fontweight=fontweight)
+
+# Save the figure
+plt.savefig('Soil_forest_correlation_matrix.png', format='png', dpi=300)
+plt.show()
+
+
+# Soil meadow - SHALLOW 2
+
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy.stats import spearmanr
+
+# Filter out data points with specified Types
+filtered_data = data[
+    (data['Type'] != 'Soil na') &
+    (data['Type'] != 'Atmosphere') &
+    (data['Type'] != 'Well') &
+    (data['Type'] != 'Well epi') &
+    (data['Type'] != 'Cave GR') &
+    (data['Type'] != 'Cave GF') &
+    (data['Cover'] != 'Forest') &
+    (data['Name'] != 'SG-05-CO2-10') &
+    (data['Name'] != 'SG-05-CO2-4')
+]
+
+# Define the parameters you want to calculate correlations for
+parameters = ['pCO2corr', 'd13Ccorr', 'F14C', 'Monthly mean temperature', 'Monthly mean precipitation']
+
+# Create DataFrames for the correlations and p-values
+correlation_df = pd.DataFrame(index=parameters, columns=parameters)
+p_value_df = pd.DataFrame(index=parameters, columns=parameters)
+
+# Calculate correlations for each combination of parameters
+for param1 in parameters:
+    for param2 in parameters:
+        correlation_coefficient, p_value = spearmanr(filtered_data[param1], filtered_data[param2])
+        
+        # Fill the correlation and p-value matrices
+        correlation_df.loc[param1, param2] = correlation_coefficient
+        p_value_df.loc[param1, param2] = p_value
+
+# Set up the color map
+cmap = sns.diverging_palette(250, 10, as_cmap=True)
+
+# Plot the correlation matrix
+plt.figure(figsize=(10, 8))
+
+# Rename the parameter labels here
+param_labels = {
+    'pCO2corr': 'pCO$\mathregular{_2}$',
+    'd13Ccorr': r'$\delta$¹³C',
+    'F14C': 'F$\mathregular{^{14}}$C',
+    'Monthly mean temperature': 'MMT',
+    'Monthly mean precipitation': 'MMP'
+}
+
+# Rename row and column labels
+correlation_df.rename(index=param_labels, columns=param_labels, inplace=True)
+p_value_df.rename(index=param_labels, columns=param_labels, inplace=True)
+
+# Create the heatmap
+heatmap = sns.heatmap(correlation_df.astype(float), annot=False, cmap=cmap, center=0, linewidths=0.5, cbar_kws={'label': 'Correlation Strength'})
+
+# Annotate the heatmap with correlation values
+for i in range(len(correlation_df)):
+    for j in range(len(correlation_df.columns)):
+        correlation_value = correlation_df.iloc[i, j]
+        p_value = p_value_df.iloc[i, j]
+        text_color = 'black'
+        fontweight = 'bold' if p_value < 0.05 else 'normal'
+        heatmap.text(j+0.5, i+0.5, f'{correlation_value:.2f}', ha='center', va='center', color=text_color, fontsize=10, fontweight=fontweight)
+
+# Save the figure
+plt.savefig('Soil_meadow_correlation_matrix.png', format='png', dpi=300)
+plt.show()
+
+# Epikarst Forest - DEEP 1, DEEP2
+
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy.stats import spearmanr
+
+# Filter out data points with specified Types
+filtered_data = data[
+    (data['Type'] != 'Soil na') &
+    (data['Type'] != 'Atmosphere') &
+    (data['Type'] != 'Well') &
+    (data['Type'] != 'Well soil') &
+    (data['Type'] != 'Cave GR') &
+    (data['Type'] != 'Cave GF') &
+    (data['Cover'] != 'Meadow') &
+    (data['Name'] != 'SG-05-CO2-10') &
+    (data['Name'] != 'SG-05-CO2-4')
+]
+
+# Define the parameters you want to calculate correlations for
+parameters = ['pCO2corr', 'd13Ccorr', 'F14C', 'Monthly mean temperature', 'Monthly mean precipitation']
+
+# Create DataFrames for the correlations and p-values
+correlation_df = pd.DataFrame(index=parameters, columns=parameters)
+p_value_df = pd.DataFrame(index=parameters, columns=parameters)
+
+# Calculate correlations for each combination of parameters
+for param1 in parameters:
+    for param2 in parameters:
+        correlation_coefficient, p_value = spearmanr(filtered_data[param1], filtered_data[param2])
+        
+        # Fill the correlation and p-value matrices
+        correlation_df.loc[param1, param2] = correlation_coefficient
+        p_value_df.loc[param1, param2] = p_value
+
+# Set up the color map
+cmap = sns.diverging_palette(250, 10, as_cmap=True)
+
+# Plot the correlation matrix
+plt.figure(figsize=(10, 8))
+
+# Rename the parameter labels here
+param_labels = {
+    'pCO2corr': 'pCO$\mathregular{_2}$',
+    'd13Ccorr': r'$\delta$¹³C',
+    'F14C': 'F$\mathregular{^{14}}$C',
+    'Monthly mean temperature': 'MMT',
+    'Monthly mean precipitation': 'MMP'
+}
+
+# Rename row and column labels
+correlation_df.rename(index=param_labels, columns=param_labels, inplace=True)
+p_value_df.rename(index=param_labels, columns=param_labels, inplace=True)
+
+# Create the heatmap
+heatmap = sns.heatmap(correlation_df.astype(float), annot=False, cmap=cmap, center=0, linewidths=0.5, cbar_kws={'label': 'Correlation Strength'})
+
+# Annotate the heatmap with correlation values
+for i in range(len(correlation_df)):
+    for j in range(len(correlation_df.columns)):
+        correlation_value = correlation_df.iloc[i, j]
+        p_value = p_value_df.iloc[i, j]
+        text_color = 'black'
+        fontweight = 'bold' if p_value < 0.05 else 'normal'
+        heatmap.text(j+0.5, i+0.5, f'{correlation_value:.2f}', ha='center', va='center', color=text_color, fontsize=10, fontweight=fontweight)
+
+# Save the figure
+plt.savefig('Epi_forest_correlation_matrix.png', format='png', dpi=300)
+plt.show()
+
+
+# Epikarst meadow - DEEP 3, DEEP 4
+
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy.stats import spearmanr
+
+# Filter out data points with specified Types
+filtered_data = data[
+    (data['Type'] != 'Soil na') &
+    (data['Type'] != 'Atmosphere') &
+    (data['Type'] != 'Well') &
+    (data['Type'] != 'Well soil') &
+    (data['Type'] != 'Cave GR') &
+    (data['Type'] != 'Cave GF') &
+    (data['Cover'] != 'Forest') &
+    (data['Name'] != 'SG-05-CO2-10') &
+    (data['Name'] != 'SG-05-CO2-4')
+]
+
+# Define the parameters you want to calculate correlations for
+parameters = ['pCO2corr', 'd13Ccorr', 'F14C', 'Monthly mean temperature', 'Monthly mean precipitation']
+
+# Create DataFrames for the correlations and p-values
+correlation_df = pd.DataFrame(index=parameters, columns=parameters)
+p_value_df = pd.DataFrame(index=parameters, columns=parameters)
+
+# Calculate correlations for each combination of parameters
+for param1 in parameters:
+    for param2 in parameters:
+        correlation_coefficient, p_value = spearmanr(filtered_data[param1], filtered_data[param2])
+        
+        # Fill the correlation and p-value matrices
+        correlation_df.loc[param1, param2] = correlation_coefficient
+        p_value_df.loc[param1, param2] = p_value
+
+# Set up the color map
+cmap = sns.diverging_palette(250, 10, as_cmap=True)
+
+# Plot the correlation matrix
+plt.figure(figsize=(10, 8))
+
+# Rename the parameter labels here
+param_labels = {
+    'pCO2corr': 'pCO$\mathregular{_2}$',
+    'd13Ccorr': r'$\delta$¹³C',
+    'F14C': 'F$\mathregular{^{14}}$C',
+    'Monthly mean temperature': 'MMT',
+    'Monthly mean precipitation': 'MMP'
+}
+
+# Rename row and column labels
+correlation_df.rename(index=param_labels, columns=param_labels, inplace=True)
+p_value_df.rename(index=param_labels, columns=param_labels, inplace=True)
+
+# Create the heatmap
+heatmap = sns.heatmap(correlation_df.astype(float), annot=False, cmap=cmap, center=0, linewidths=0.5, cbar_kws={'label': 'Correlation Strength'})
+
+# Annotate the heatmap with correlation values
+for i in range(len(correlation_df)):
+    for j in range(len(correlation_df.columns)):
+        correlation_value = correlation_df.iloc[i, j]
+        p_value = p_value_df.iloc[i, j]
+        text_color = 'black'
+        fontweight = 'bold' if p_value < 0.05 else 'normal'
+        heatmap.text(j+0.5, i+0.5, f'{correlation_value:.2f}', ha='center', va='center', color=text_color, fontsize=10, fontweight=fontweight)
+
+# Save the figure
+plt.savefig('Epi_meadow_correlation_matrix.png', format='png', dpi=300)
+plt.show()
